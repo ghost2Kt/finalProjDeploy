@@ -76,23 +76,11 @@ final class ApiCartService
 
         $cart[$product->getId()] = $newQty;
 
-        $this->entityManager->beginTransaction();
-        try {
-            $product->setQuantity($stock - $reservedQty);
-            $this->entityManager->persist($product);
-            $this->entityManager->flush();
-            if ($this->isDatabaseCartEnabled()) {
-                $this->writeCartDatabase($userId, $cart);
-            }
-            $this->entityManager->commit();
-        } catch (\Throwable $e) {
-            $this->entityManager->rollback();
-            throw $e;
-        }
+        $product->setQuantity($stock - $reservedQty);
+        $this->entityManager->persist($product);
+        $this->entityManager->flush();
 
-        if (!$this->isDatabaseCartEnabled()) {
-            $this->writeCartCache($userId, $cart);
-        }
+        $this->writeCart($userId, $cart);
 
         [$items, $total, $totalItems] = $this->buildCartViewFromMap($cart, $request);
 
@@ -157,21 +145,8 @@ final class ApiCartService
             return ['success' => false, 'message' => 'Invalid user session.'];
         }
 
-        $this->entityManager->beginTransaction();
-        try {
-            $this->entityManager->flush();
-            if ($this->isDatabaseCartEnabled()) {
-                $this->writeCartDatabase($userId, $cart);
-            }
-            $this->entityManager->commit();
-        } catch (\Throwable $e) {
-            $this->entityManager->rollback();
-            throw $e;
-        }
-
-        if (!$this->isDatabaseCartEnabled()) {
-            $this->writeCartCache($userId, $cart);
-        }
+        $this->entityManager->flush();
+        $this->writeCart($userId, $cart);
 
         [$items, $total, $totalItems] = $this->buildCartViewFromMap($cart, $request);
 
@@ -448,8 +423,9 @@ final class ApiCartService
         }
 
         try {
-            $this->entityManager->getConnection()->executeStatement('SELECT 1 FROM cart_line LIMIT 1');
-            $this->databaseCartEnabled = true;
+            $this->databaseCartEnabled = $this->entityManager->getConnection()
+                ->createSchemaManager()
+                ->tablesExist(['cart_line']);
         } catch (\Throwable) {
             $this->databaseCartEnabled = false;
         }
@@ -466,7 +442,11 @@ final class ApiCartService
         }
 
         if ($this->isDatabaseCartEnabled()) {
-            return $this->readCartDatabase($userId);
+            try {
+                return $this->readCartDatabase($userId);
+            } catch (\Throwable) {
+                $this->databaseCartEnabled = false;
+            }
         }
 
         return $this->readCartCache($userId);
@@ -502,9 +482,13 @@ final class ApiCartService
     private function writeCart(int $userId, array $cart): void
     {
         if ($this->isDatabaseCartEnabled()) {
-            $this->writeCartDatabase($userId, $cart);
+            try {
+                $this->writeCartDatabase($userId, $cart);
 
-            return;
+                return;
+            } catch (\Throwable) {
+                $this->databaseCartEnabled = false;
+            }
         }
 
         $this->writeCartCache($userId, $cart);

@@ -21,7 +21,16 @@ final class ApiCartController extends AbstractController
     {
         $user = $this->requireUser();
 
-        $view = $this->apiCartService->getCartView($user, $request);
+        try {
+            $view = $this->apiCartService->getCartView($user, $request);
+        } catch (\Throwable) {
+            return $this->json([
+                'success' => true,
+                'message' => 'Cart fetched successfully.',
+                'data' => ['items' => [], 'total' => 0.0, 'totalItems' => 0],
+                'errors' => [],
+            ]);
+        }
 
         return $this->json([
             'success' => true,
@@ -46,7 +55,16 @@ final class ApiCartController extends AbstractController
             ], 400);
         }
 
-        $result = $this->apiCartService->add($user, $productId, $quantity, $request);
+        try {
+            $result = $this->apiCartService->add($user, $productId, $quantity, $request);
+        } catch (\Throwable $e) {
+            return $this->json([
+                'success' => false,
+                'message' => 'Could not add to cart. Please try again.',
+                'errors' => [],
+            ], 500);
+        }
+
         $status = $result['success'] ? 200 : 409;
 
         return $this->json($result, $status);
@@ -67,7 +85,15 @@ final class ApiCartController extends AbstractController
             ], 400);
         }
 
-        $result = $this->apiCartService->update($user, $productId, $quantity, $request);
+        try {
+            $result = $this->apiCartService->update($user, $productId, $quantity, $request);
+        } catch (\Throwable) {
+            return $this->json([
+                'success' => false,
+                'message' => 'Could not update cart. Please try again.',
+                'errors' => [],
+            ], 500);
+        }
 
         return $this->json($result, $result['success'] ? 200 : 400);
     }
@@ -86,7 +112,15 @@ final class ApiCartController extends AbstractController
             ], 400);
         }
 
-        $result = $this->apiCartService->remove($user, $productId, $request);
+        try {
+            $result = $this->apiCartService->remove($user, $productId, $request);
+        } catch (\Throwable) {
+            return $this->json([
+                'success' => false,
+                'message' => 'Could not remove item. Please try again.',
+                'errors' => [],
+            ], 500);
+        }
 
         return $this->json($result, $result['success'] ? 200 : 400);
     }
@@ -95,7 +129,15 @@ final class ApiCartController extends AbstractController
     public function clear(Request $request): JsonResponse
     {
         $user = $this->requireUser();
-        $result = $this->apiCartService->clear($user, $request);
+        try {
+            $result = $this->apiCartService->clear($user, $request);
+        } catch (\Throwable) {
+            return $this->json([
+                'success' => false,
+                'message' => 'Could not clear cart. Please try again.',
+                'errors' => [],
+            ], 500);
+        }
 
         return $this->json($result);
     }

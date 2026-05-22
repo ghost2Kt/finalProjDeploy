@@ -37,7 +37,8 @@ class CartLineRepository extends ServiceEntityRepository
     {
         return $this->createQueryBuilder('c')
             ->innerJoin('c.product', 'p')->addSelect('p')
-            ->andWhere('c.user = :userId')
+            ->innerJoin('c.user', 'u')
+            ->andWhere('u.id = :userId')
             ->setParameter('userId', $userId)
             ->getQuery()
             ->getResult();
@@ -45,10 +46,11 @@ class CartLineRepository extends ServiceEntityRepository
 
     public function deleteForUserId(int $userId): void
     {
+        $userRef = $this->getEntityManager()->getReference(User::class, $userId);
         $this->createQueryBuilder('c')
             ->delete()
-            ->andWhere('c.user = :userId')
-            ->setParameter('userId', $userId)
+            ->andWhere('c.user = :user')
+            ->setParameter('user', $userRef)
             ->getQuery()
             ->execute();
     }
