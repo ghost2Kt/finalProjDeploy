@@ -7,23 +7,28 @@ use App\Entity\Order;
 use App\Entity\OrderItem;
 use App\Entity\Product;
 use App\Entity\User;
+use App\Entity\CartLine;
+use App\Repository\CartLineRepository;
 use App\Repository\ProductRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Cache\CacheItemPoolInterface;
 use Symfony\Component\HttpFoundation\Request;
 
 /**
- * Stateless API cart backed by cache (per user id). Mirrors web session cart behavior.
+ * Mobile/API cart: MySQL cart_line when migrated, else Symfony cache (legacy fallback).
  */
 final class ApiCartService
 {
-    private const CACHE_TTL = 604800; // 7 days
+    private const CACHE_TTL = 604800;
+
+    private ?bool $databaseCartEnabled = null;
 
     public function __construct(
-        private CacheItemPoolInterface $cache,
+        private CartLineRepository $cartLineRepository,
         private ProductRepository $productRepository,
         private EntityManagerInterface $entityManager,
         private ActivityLogService $activityLogService,
+        private CacheItemPoolInterface $cache,
     ) {
     }
 
@@ -64,13 +69,32 @@ final class ApiCartService
             return ['success' => false, 'message' => 'Unable to reserve stock for this product.'];
         }
 
-        $cart[$product->getId()] = $newQty;
-        $this->writeCart($user, $cart);
-        $product->setQuantity($stock - $reservedQty);
-        $this->entityManager->persist($product);
-        $this->entityManager->flush();
+        $userId = $user->getId();
+        if ($userId === null) {
+            return ['success' => false, 'message' => 'Invalid user session.'];
+        }
 
-        [$items, $total, $totalItems] = $this->buildCartView($user, $request);
+        $cart[$product->getId()] = $newQty;
+
+        $this->entityManager->beginTransaction();
+        try {
+            $product->setQuantity($stock - $reservedQty);
+            $this->entityManager->persist($product);
+            $this->entityManager->flush();
+            if ($this->isDatabaseCartEnabled()) {
+                $this->writeCartDatabase($userId, $cart);
+            }
+            $this->entityManager->commit();
+        } catch (\Throwable $e) {
+            $this->entityManager->rollback();
+            throw $e;
+        }
+
+        if (!$this->isDatabaseCartEnabled()) {
+            $this->writeCartCache($userId, $cart);
+        }
+
+        [$items, $total, $totalItems] = $this->buildCartViewFromMap($cart, $request);
 
         return [
             'success' => true,
@@ -79,6 +103,7 @@ final class ApiCartService
                 'productId' => $product->getId(),
                 'cartQuantityForProduct' => $newQty,
                 'cartTotalItems' => $totalItems,
+                'totalItems' => $totalItems,
                 'remainingStock' => (int) ($product->getQuantity() ?? 0),
                 'items' => $items,
                 'total' => $total,
@@ -127,10 +152,28 @@ final class ApiCartService
             }
         }
 
-        $this->writeCart($user, $cart);
-        $this->entityManager->flush();
+        $userId = $user->getId();
+        if ($userId === null) {
+            return ['success' => false, 'message' => 'Invalid user session.'];
+        }
 
-        [$items, $total, $totalItems] = $this->buildCartView($user, $request);
+        $this->entityManager->beginTransaction();
+        try {
+            $this->entityManager->flush();
+            if ($this->isDatabaseCartEnabled()) {
+                $this->writeCartDatabase($userId, $cart);
+            }
+            $this->entityManager->commit();
+        } catch (\Throwable $e) {
+            $this->entityManager->rollback();
+            throw $e;
+        }
+
+        if (!$this->isDatabaseCartEnabled()) {
+            $this->writeCartCache($userId, $cart);
+        }
+
+        [$items, $total, $totalItems] = $this->buildCartViewFromMap($cart, $request);
 
         return [
             'success' => true,
@@ -162,9 +205,15 @@ final class ApiCartService
             $this->entityManager->flush();
         }
         unset($cart[$product->getId()]);
-        $this->writeCart($user, $cart);
 
-        [$items, $total, $totalItems] = $this->buildCartView($user, $request);
+        $userId = $user->getId();
+        if ($userId === null) {
+            return ['success' => false, 'message' => 'Invalid user session.'];
+        }
+
+        $this->writeCart($userId, $cart);
+
+        [$items, $total, $totalItems] = $this->buildCartViewFromMap($cart, $request);
 
         return [
             'success' => true,
@@ -208,7 +257,10 @@ final class ApiCartService
             $this->entityManager->flush();
         }
 
-        $this->writeCart($user, []);
+        $userId = $user->getId();
+        if ($userId !== null) {
+            $this->writeCart($userId, []);
+        }
 
         return [
             'success' => true,
@@ -308,7 +360,10 @@ final class ApiCartService
             sprintf('Order %s created from mobile API checkout', (string) $order->getOrderNumber())
         );
 
-        $this->writeCart($user, []);
+        $userId = $user->getId();
+        if ($userId !== null) {
+            $this->writeCart($userId, []);
+        }
 
         return [
             'success' => true,
@@ -328,7 +383,16 @@ final class ApiCartService
      */
     private function buildCartView(User $user, Request $request): array
     {
-        $cart = $this->readCart($user);
+        return $this->buildCartViewFromMap($this->readCart($user), $request);
+    }
+
+    /**
+     * @param array<int, int> $cart
+     *
+     * @return array{0: list<array<string, mixed>>, 1: float, 2: int}
+     */
+    private function buildCartViewFromMap(array $cart, Request $request): array
+    {
         if ($cart === []) {
             return [[], 0.0, 0];
         }
@@ -343,7 +407,6 @@ final class ApiCartService
         $items = [];
         $total = 0.0;
         $totalItems = 0;
-        $normalizedCart = [];
 
         foreach ($cart as $productId => $quantity) {
             $productId = (int) $productId;
@@ -371,20 +434,62 @@ final class ApiCartService
                 'category' => $product->getCategory()?->getName(),
                 'imageUrl' => $imageUrl,
             ];
-            $normalizedCart[$productId] = $quantity;
             $total += $subtotal;
             $totalItems += $quantity;
         }
 
-        $this->writeCart($user, $normalizedCart);
-
         return [$items, $total, $totalItems];
+    }
+
+    private function isDatabaseCartEnabled(): bool
+    {
+        if ($this->databaseCartEnabled !== null) {
+            return $this->databaseCartEnabled;
+        }
+
+        try {
+            $this->entityManager->getConnection()->executeStatement('SELECT 1 FROM cart_line LIMIT 1');
+            $this->databaseCartEnabled = true;
+        } catch (\Throwable) {
+            $this->databaseCartEnabled = false;
+        }
+
+        return $this->databaseCartEnabled;
     }
 
     /** @return array<int, int> */
     private function readCart(User $user): array
     {
-        $item = $this->cache->getItem($this->cartKey($user));
+        $userId = $user->getId();
+        if ($userId === null) {
+            return [];
+        }
+
+        if ($this->isDatabaseCartEnabled()) {
+            return $this->readCartDatabase($userId);
+        }
+
+        return $this->readCartCache($userId);
+    }
+
+    /** @return array<int, int> */
+    private function readCartDatabase(int $userId): array
+    {
+        $cart = [];
+        foreach ($this->cartLineRepository->findForUserId($userId) as $line) {
+            $product = $line->getProduct();
+            if ($product?->getId()) {
+                $cart[$product->getId()] = $line->getQuantity();
+            }
+        }
+
+        return $cart;
+    }
+
+    /** @return array<int, int> */
+    private function readCartCache(int $userId): array
+    {
+        $item = $this->cache->getItem($this->cartCacheKey($userId));
         if (!$item->isHit()) {
             return [];
         }
@@ -394,17 +499,72 @@ final class ApiCartService
     }
 
     /** @param array<int, int> $cart */
-    private function writeCart(User $user, array $cart): void
+    private function writeCart(int $userId, array $cart): void
     {
-        $item = $this->cache->getItem($this->cartKey($user));
+        if ($this->isDatabaseCartEnabled()) {
+            $this->writeCartDatabase($userId, $cart);
+
+            return;
+        }
+
+        $this->writeCartCache($userId, $cart);
+    }
+
+    /** @param array<int, int> $cart */
+    private function writeCartDatabase(int $userId, array $cart): void
+    {
+        $userRef = $this->entityManager->getReference(User::class, $userId);
+        $existing = [];
+        foreach ($this->cartLineRepository->findForUserId($userId) as $line) {
+            $product = $line->getProduct();
+            if ($product?->getId()) {
+                $existing[$product->getId()] = $line;
+            }
+        }
+
+        $seen = [];
+        foreach ($cart as $productId => $quantity) {
+            $productId = (int) $productId;
+            $quantity = max(0, (int) $quantity);
+            if ($productId <= 0 || $quantity <= 0) {
+                continue;
+            }
+            $seen[$productId] = true;
+            $line = $existing[$productId] ?? null;
+            if (!$line instanceof CartLine) {
+                $product = $this->productRepository->find($productId);
+                if (!$product instanceof Product) {
+                    continue;
+                }
+                $line = new CartLine();
+                $line->setUser($userRef);
+                $line->setProduct($product);
+                $this->entityManager->persist($line);
+            }
+            $line->setQuantity($quantity);
+        }
+
+        foreach ($existing as $productId => $line) {
+            if (!isset($seen[$productId])) {
+                $this->entityManager->remove($line);
+            }
+        }
+
+        $this->entityManager->flush();
+    }
+
+    /** @param array<int, int> $cart */
+    private function writeCartCache(int $userId, array $cart): void
+    {
+        $item = $this->cache->getItem($this->cartCacheKey($userId));
         $item->set($cart);
         $item->expiresAfter(self::CACHE_TTL);
         $this->cache->save($item);
     }
 
-    private function cartKey(User $user): string
+    private function cartCacheKey(int $userId): string
     {
-        return 'api_cart_user_' . (string) $user->getId();
+        return 'api_cart_user_' . $userId;
     }
 
     private function isValidPhoneNumber(string $phone): bool

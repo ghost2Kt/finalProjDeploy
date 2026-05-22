@@ -25,7 +25,9 @@ if [ -f bin/console ]; then
   php bin/console cache:clear --env=prod --no-debug || true
 
   echo "Running database migrations..."
-  php bin/console doctrine:migrations:migrate --no-interaction --env=prod || true
+  if ! php bin/console doctrine:migrations:migrate --no-interaction --env=prod; then
+    echo "WARNING: database migrations failed (cart may not work until cart_line table exists)."
+  fi
 fi
 
 if [ -f /etc/nginx/conf.d/default.conf.template ]; then
