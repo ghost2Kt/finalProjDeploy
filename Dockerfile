@@ -11,6 +11,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libicu-dev \
     libxml2-dev \
     libonig-dev \
+    libpng-dev \
+    libjpeg62-turbo-dev \
+    libwebp-dev \
     nginx \
     gettext-base \
     nodejs \
@@ -18,13 +21,15 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
-RUN docker-php-ext-install \
+RUN docker-php-ext-configure gd --with-jpeg --with-webp \
+    && docker-php-ext-install \
     intl \
     xml \
     pdo \
     pdo_mysql \
     mbstring \
-    opcache
+    opcache \
+    gd
 
 RUN curl -sS https://getcomposer.org/installer | php -- \
     --install-dir=/usr/local/bin \
