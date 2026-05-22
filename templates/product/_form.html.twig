@@ -1,6 +1,6 @@
 <div class="form-container">
     <h2><i class="bi bi-cart-plus"></i> {{ title|default('Product Form') }}</h2>
-    {{ form_start(form, {'attr': {'enctype': 'multipart/form-data', 'class': 'product-form'}}) }}
+    {{ form_start(form, {'attr': {'enctype': 'multipart/form-data', 'class': 'product-form', 'data-turbo': 'false'}}) }}
 
     <div class="form-grid">
         <div class="form-group">

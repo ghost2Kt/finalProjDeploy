@@ -126,7 +126,7 @@
   </div>
   
   <div class="form-container">
-    {{ form_start(form, {'attr': {'enctype': 'multipart/form-data', 'class': 'product-form'}}) }}
+    {{ form_start(form, {'attr': {'enctype': 'multipart/form-data', 'class': 'product-form', 'data-turbo': 'false'}}) }}
 
     <div class="form-grid">
         <div class="form-group">
@@ -329,7 +329,7 @@ function updateFileLabel(input) {
           </div>
           
           <div class="form-container">
-            {{ form_start(form, {'attr': {'enctype': 'multipart/form-data', 'class': 'product-form'}}) }}
+            {{ form_start(form, {'attr': {'enctype': 'multipart/form-data', 'class': 'product-form', 'data-turbo': 'false'}}) }}
 
             <div class="form-grid">
                 <div class="form-group">

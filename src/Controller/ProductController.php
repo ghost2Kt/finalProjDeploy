@@ -111,12 +111,18 @@ final class ProductController extends AbstractController
             // Log the action
             $this->activityLogService->logProductCreate($product);
 
+            $this->addFlash('success', 'Product saved successfully.');
+
             // Redirect to admin route if user is admin/staff
             if ($this->isGranted('ROLE_ADMIN') || $this->isGranted('ROLE_STAFF')) {
                 return $this->redirectToRoute('app_admin_products_index', [], Response::HTTP_SEE_OTHER);
             }
 
             return $this->redirectToRoute('app_product_index', [], Response::HTTP_SEE_OTHER);
+        }
+
+        if ($form->isSubmitted() && !$form->isValid()) {
+            $this->addFlash('error', 'Could not save the product. Check the highlighted fields below.');
         }
 
         $isAdmin = $this->isGranted('ROLE_ADMIN') || $this->isGranted('ROLE_STAFF');
@@ -215,12 +221,18 @@ final class ProductController extends AbstractController
         // Log the action
         $this->activityLogService->logProductUpdate($product);
 
+        $this->addFlash('success', 'Product updated successfully.');
+
         // Redirect to admin route if user is admin/staff
         if ($this->isGranted('ROLE_ADMIN') || $this->isGranted('ROLE_STAFF')) {
             return $this->redirectToRoute('app_admin_products_index', [], Response::HTTP_SEE_OTHER);
         }
 
         return $this->redirectToRoute('app_product_index', [], Response::HTTP_SEE_OTHER);
+    }
+
+    if ($form->isSubmitted() && !$form->isValid()) {
+        $this->addFlash('error', 'Could not update the product. Check the highlighted fields below.');
     }
 
     $isAdmin = $this->isGranted('ROLE_ADMIN') || $this->isGranted('ROLE_STAFF');

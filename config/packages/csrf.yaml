@@ -5,7 +5,7 @@ framework:
             token_id: submit
 
     csrf_protection:
+        # Product/admin forms use session CSRF (works without JS). Login/logout stay stateless.
         stateless_token_ids:
-            - submit
             - authenticate
             - logout
