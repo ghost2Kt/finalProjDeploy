@@ -349,6 +349,9 @@ final class ApiCartService
                 'total' => (float) $order->getTotal(),
                 'paymentMethod' => $paymentLabel,
                 'status' => $order->getStatus() ?? 'Pending',
+                'items' => [],
+                'cartTotalItems' => 0,
+                'totalItems' => 0,
             ],
         ];
     }
@@ -484,13 +487,15 @@ final class ApiCartService
         if ($this->isDatabaseCartEnabled()) {
             try {
                 $this->writeCartDatabase($userId, $cart);
-
-                return;
             } catch (\Throwable) {
                 $this->databaseCartEnabled = false;
+                $this->writeCartCache($userId, $cart);
+
+                return;
             }
         }
 
+        // Keep cache in sync so readCart fallback never shows stale items after checkout/clear.
         $this->writeCartCache($userId, $cart);
     }
 
