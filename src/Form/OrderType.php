@@ -44,6 +44,14 @@ class OrderType extends AbstractType
                 'widget' => 'single_text',
                 'required' => true,
             ])
+            ->add('status', ChoiceType::class, [
+                'label' => 'Status',
+                'choices' => [
+                    'Pending' => 'Pending',
+                    'Paid' => 'Paid',
+                ],
+                'required' => false,
+            ])
             ->add('orderItems', CollectionType::class, [
                 'entry_type' => OrderItemType::class,
                 'entry_options' => ['label' => false],
