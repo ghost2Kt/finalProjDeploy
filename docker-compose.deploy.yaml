@@ -26,6 +26,7 @@ services:
     restart: unless-stopped
     volumes:
       - app_var:/var/www/html/var
+      - uploads_data:/var/www/html/public/uploads
     networks:
       - agrinest_network
     depends_on:
@@ -69,6 +70,7 @@ services:
 volumes:
   agrinest_mysql_data:
   app_var:
+  uploads_data:
 
 networks:
   agrinest_network:

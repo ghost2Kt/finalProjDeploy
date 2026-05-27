@@ -10,6 +10,10 @@ if [ -d /var/www/html/var ]; then
   chown -R www-data:www-data /var/www/html/var || true
 fi
 
+mkdir -p /var/www/html/public/uploads/images
+chmod -R 775 /var/www/html/public/uploads || true
+chown -R www-data:www-data /var/www/html/public/uploads || true
+
 echo "Starting PHP-FPM..."
 php-fpm -D
 sleep 2

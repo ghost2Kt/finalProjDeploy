@@ -30,3 +30,7 @@ services:
     App\Service\GoogleIdTokenVerifier:
         arguments:
             $googleWebClientId: '%env(GOOGLE_MOBILE_WEB_CLIENT_ID)%'
+
+    App\Service\ProductImageUploader:
+        arguments:
+            $uploadsDirectory: '%uploads_directory%'

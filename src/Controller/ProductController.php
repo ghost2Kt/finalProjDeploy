@@ -7,6 +7,7 @@ use App\Form\ProductType;
 use App\Repository\ProductRepository;
 use App\Entity\StockLog;
 use App\Service\ActivityLogService;
+use App\Service\ProductImageUploader;
 use App\Service\StockLogService;
 use Doctrine\DBAL\Exception\ForeignKeyConstraintViolationException;
 use Doctrine\ORM\EntityManagerInterface;
@@ -25,6 +26,7 @@ final class ProductController extends AbstractController
     public function __construct(
         private ActivityLogService $activityLogService,
         private StockLogService $stockLogService,
+        private ProductImageUploader $productImageUploader,
     ) {
     }
     #[Route(name: 'app_product_index', methods: ['GET'])]
@@ -75,21 +77,22 @@ final class ProductController extends AbstractController
             $imageFile = $form->get('image')->getData();
 
             if ($imageFile) {
-                $originalFilename = pathinfo($imageFile->getClientOriginalName(), PATHINFO_FILENAME);
-                $safeFilename = $slugger->slug($originalFilename);
-                $newFilename = $safeFilename.'-'.uniqid().'.'.$imageFile->guessExtension();
-
                 try {
-                    $imageFile->move(
-                        $this->getParameter('uploads_directory') . '/images',
-                        $newFilename
+                    $product->setImage(
+                        $this->productImageUploader->upload($imageFile, $slugger),
                     );
                 } catch (FileException $e) {
-                    // handle exception if something happens during file upload
-                }
+                    $this->addFlash(
+                        'error',
+                        'Product image could not be saved. Check that uploads/images is writable, then try again.',
+                    );
 
-                // store the file name instead of its contents
-                $product->setImage($newFilename);
+                    return $this->render('product/new.html.twig', [
+                        'product' => $product,
+                        'form' => $form,
+                        'isAdmin' => $this->isGranted('ROLE_ADMIN') || $this->isGranted('ROLE_STAFF'),
+                    ]);
+                }
             }
 
             // Set the creator if user is logged in
@@ -182,30 +185,17 @@ final class ProductController extends AbstractController
         $imageFile = $form->get('image')->getData();
 
         if ($imageFile) {
-            // Generate new filename
-            $originalFilename = pathinfo($imageFile->getClientOriginalName(), PATHINFO_FILENAME);
-            $safeFilename = $slugger->slug($originalFilename);
-            $newFilename = $safeFilename . '-' . uniqid() . '.' . $imageFile->guessExtension();
-
+            $previousImage = $product->getImage();
             try {
-                $imageFile->move(
-                    $this->getParameter('uploads_directory') . '/images',
-                    $newFilename
-                );
+                $newFilename = $this->productImageUploader->upload($imageFile, $slugger);
+                $this->productImageUploader->delete($previousImage);
+                $product->setImage($newFilename);
             } catch (FileException $e) {
-                // handle upload error
+                $this->addFlash(
+                    'error',
+                    'Product image could not be updated. Check that uploads/images is writable, then try again.',
+                );
             }
-
-            // Optionally delete old image (if exists)
-            if ($product->getImage()) {
-                $oldImagePath = $this->getParameter('uploads_directory') . '/images/' . $product->getImage();
-                if (file_exists($oldImagePath)) {
-                    unlink($oldImagePath);
-                }
-            }
-
-            // Set new image name
-            $product->setImage($newFilename);
         }
 
         $entityManager->flush();
