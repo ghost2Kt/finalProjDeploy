@@ -167,7 +167,7 @@
                         Taxes and delivery fees are not included in this estimate.
                     </p>
 
-                    <a href="{{ path('app_cart_checkout') }}" class="checkout-btn checkout-btn--primary cart-sidebar-cta">
+                    <a href="{{ path('app_cart_checkout') }}" class="checkout-btn checkout-btn--primary cart-sidebar-cta" data-turbo="false">
                         <i class="bi bi-credit-card"></i> Proceed to checkout
                     </a>
                     <a href="{{ path('app_product_index') }}" class="checkout-btn checkout-btn--ghost cart-sidebar-secondary">
@@ -190,7 +190,7 @@
                 <span>Total</span>
                 <strong>₱{{ total|number_format(2, '.', ',') }}</strong>
             </div>
-            <a href="{{ path('app_cart_checkout') }}" class="checkout-btn checkout-btn--primary cart-mobile-bar__cta">
+            <a href="{{ path('app_cart_checkout') }}" class="checkout-btn checkout-btn--primary cart-mobile-bar__cta" data-turbo="false">
                 <i class="bi bi-credit-card"></i> Checkout
             </a>
         </div>

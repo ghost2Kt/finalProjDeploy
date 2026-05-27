@@ -1100,6 +1100,23 @@
     top: 1rem;
 }
 
+/* Sticky summary must not sit on top of the payment form (blocks clicks). */
+.checkout-page .checkout-panel--summary {
+    position: static;
+}
+
+.checkout-page .checkout-main {
+    position: relative;
+    z-index: 2;
+}
+
+.checkout-page .checkout-panel--payment,
+.checkout-page .checkout-actions {
+    position: relative;
+    z-index: 3;
+    pointer-events: auto;
+}
+
 .checkout-panel__head {
     display: flex;
     align-items: center;
@@ -1303,6 +1320,24 @@
     min-height: auto;
     width: 100%;
     box-sizing: border-box;
+    pointer-events: auto;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.checkout-pay-radio {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    opacity: 0;
+    cursor: pointer;
+    z-index: 2;
+}
+
+.checkout-pay-card:has(.checkout-pay-radio:focus-visible) {
+    outline: 2px solid #ff8c53;
+    outline-offset: 2px;
 }
 
 .checkout-pay-card:hover {
@@ -2472,8 +2507,8 @@
     opacity: 1;
 }
 
-.agrinest-flow-page button.checkout-pay-card,
-form.checkout-form button.checkout-pay-card {
+.agrinest-flow-page label.checkout-pay-card,
+form.checkout-form label.checkout-pay-card {
     display: flex;
     flex-direction: row;
     align-items: center;
@@ -2489,10 +2524,11 @@ form.checkout-form button.checkout-pay-card {
     box-sizing: border-box;
     font-family: inherit;
     line-height: inherit;
+    pointer-events: auto;
 }
 
-.agrinest-flow-page button.checkout-pay-card:hover,
-form.checkout-form button.checkout-pay-card:hover {
+.agrinest-flow-page label.checkout-pay-card:hover,
+form.checkout-form label.checkout-pay-card:hover {
     transform: none;
     opacity: 1;
 }
@@ -2583,6 +2619,9 @@ form.checkout-form button.checkout-pay-card:hover {
     color: #fff;
     border: none;
     box-shadow: 0 10px 26px rgba(34, 197, 94, 0.35);
+    pointer-events: auto;
+    position: relative;
+    z-index: 4;
 }
 
 .agrinest-flow-page .checkout-btn--primary:hover,

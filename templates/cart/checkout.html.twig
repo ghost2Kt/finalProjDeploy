@@ -41,7 +41,7 @@
 
     <div class="checkout-layout">
         <main class="checkout-main">
-            <form method="post" action="{{ path('app_cart_checkout') }}" class="checkout-form">
+            <form method="post" action="{{ path('app_cart_checkout') }}" class="checkout-form" data-turbo="false">
                 <input type="hidden" name="_token" value="{{ csrf_token('cart_checkout') }}">
 
                 <section class="checkout-panel">
@@ -71,8 +71,6 @@
                     </div>
                     <p class="checkout-payment-intro">Choose one option below. No real payment is processed — for development and testing only.</p>
 
-                    <input type="hidden" name="payment_method" id="checkout_payment_method" value="{{ formData.payment_method ?? '' }}">
-
                     <div class="checkout-payment-grid" id="checkout_payment_options" role="radiogroup" aria-label="Payment method">
                         {% for method in paymentMethods %}
                             {% set selected = (formData.payment_method ?? '') == method.id %}
@@ -85,19 +83,26 @@
                                 {% set icon = 'bi-truck' %}
                                 {% set accent = 'cod' %}
                             {% endif %}
-                            <button
-                                type="button"
+                            <label
                                 class="checkout-pay-card checkout-pay-card--{{ accent }}{{ selected ? ' is-selected' : '' }}"
-                                data-payment-id="{{ method.id }}"
-                                aria-pressed="{{ selected ? 'true' : 'false' }}"
+                                for="payment_method_{{ method.id }}"
                             >
+                                <input
+                                    type="radio"
+                                    name="payment_method"
+                                    id="payment_method_{{ method.id }}"
+                                    value="{{ method.id }}"
+                                    class="checkout-pay-radio"
+                                    {{ selected ? 'checked' : '' }}
+                                    {{ loop.first ? 'required' : '' }}
+                                >
                                 <span class="checkout-pay-card__check" aria-hidden="true"><i class="bi bi-check-lg"></i></span>
                                 <span class="checkout-pay-card__icon" aria-hidden="true"><i class="bi {{ icon }}"></i></span>
                                 <span class="checkout-pay-card__body">
                                     <span class="checkout-pay-card__title">{{ method.label }}</span>
                                     <span class="checkout-pay-card__desc">{{ method.description }}</span>
                                 </span>
-                            </button>
+                            </label>
                         {% endfor %}
                     </div>
                     <p id="checkout_payment_error" class="checkout-payment-error" hidden>Please select a payment method.</p>
@@ -153,42 +158,41 @@
 {% block javascripts %}
     {{ parent() }}
     <script>
-        document.addEventListener('DOMContentLoaded', function () {
-            var hiddenInput = document.getElementById('checkout_payment_method');
+        function initCheckoutPaymentUi() {
             var errorEl = document.getElementById('checkout_payment_error');
             var form = document.querySelector('.checkout-form');
-            var cards = document.querySelectorAll('.checkout-pay-card[data-payment-id]');
+            var radios = document.querySelectorAll('.checkout-pay-radio');
 
-            if (!hiddenInput || cards.length === 0) {
+            if (!radios.length) {
                 return;
             }
 
-            function syncPaymentCards(selectedId) {
-                cards.forEach(function (card) {
-                    var id = card.getAttribute('data-payment-id');
-                    var selected = id === selectedId;
-                    card.classList.toggle('is-selected', selected);
-                    card.setAttribute('aria-pressed', selected ? 'true' : 'false');
+            function syncPaymentCards() {
+                radios.forEach(function (radio) {
+                    var card = radio.closest('.checkout-pay-card');
+                    if (!card) {
+                        return;
+                    }
+                    card.classList.toggle('is-selected', radio.checked);
                 });
                 if (errorEl) {
-                    errorEl.hidden = selectedId !== '';
+                    var anyChecked = Array.prototype.some.call(radios, function (r) {
+                        return r.checked;
+                    });
+                    errorEl.hidden = anyChecked;
                 }
             }
 
-            cards.forEach(function (card) {
-                card.addEventListener('click', function () {
-                    var id = card.getAttribute('data-payment-id');
-                    if (!id) {
-                        return;
-                    }
-                    hiddenInput.value = id;
-                    syncPaymentCards(id);
-                });
+            radios.forEach(function (radio) {
+                radio.addEventListener('change', syncPaymentCards);
             });
 
             if (form) {
                 form.addEventListener('submit', function (e) {
-                    if (hiddenInput.value.trim() === '') {
+                    var anyChecked = Array.prototype.some.call(radios, function (r) {
+                        return r.checked;
+                    });
+                    if (!anyChecked) {
                         e.preventDefault();
                         if (errorEl) {
                             errorEl.hidden = false;
@@ -198,7 +202,10 @@
                 });
             }
 
-            syncPaymentCards(hiddenInput.value.trim());
-        });
+            syncPaymentCards();
+        }
+
+        document.addEventListener('DOMContentLoaded', initCheckoutPaymentUi);
+        document.addEventListener('turbo:load', initCheckoutPaymentUi);
     </script>
 {% endblock %}
