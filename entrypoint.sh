@@ -11,6 +11,10 @@ if [ -d /var/www/html/var ]; then
 fi
 
 mkdir -p /var/www/html/public/uploads/images
+if [ -d /opt/uploads-seed ] && [ -z "$(ls -A /var/www/html/public/uploads/images 2>/dev/null)" ]; then
+  echo "Seeding empty uploads volume from built-in product images..."
+  cp -an /opt/uploads-seed/. /var/www/html/public/uploads/ || true
+fi
 chmod -R 775 /var/www/html/public/uploads || true
 chown -R www-data:www-data /var/www/html/public/uploads || true
 

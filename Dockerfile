@@ -58,6 +58,7 @@ RUN npm run build
 
 RUN COMPOSER_ALLOW_SUPERUSER=1 composer dump-autoload --optimize --classmap-authoritative \
     && mkdir -p var/cache var/log var/sessions public/build \
+    && cp -a public/uploads /opt/uploads-seed \
     && chmod -R 777 var/ \
     && chown -R www-data:www-data var/ || true
 
