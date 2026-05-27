@@ -43,4 +43,34 @@ final class WebSocketNotifier
             ]);
         }
     }
+
+    /** Broadcast to all authenticated clients in a shared room (e.g. `catalog` for stock updates). */
+    public function notifyRoom(string $room, string $event, array $data = []): void
+    {
+        $url = trim($this->broadcastUrl);
+        $key = trim($this->internalKey);
+        if ($url === '' || $key === '') {
+            return;
+        }
+        $room = trim($room);
+        if ($room === '') {
+            return;
+        }
+
+        try {
+            $this->httpClient->request('POST', rtrim($url, '/') . '/broadcast', [
+                'headers' => ['X-Internal-Key' => $key],
+                'json' => [
+                    'room' => $room,
+                    'event' => $event,
+                    'data' => $data,
+                ],
+                'timeout' => 3,
+            ]);
+        } catch (\Throwable $e) {
+            $this->logger?->warning('WebSocket broadcast failed: {message}', [
+                'message' => $e->getMessage(),
+            ]);
+        }
+    }
 }

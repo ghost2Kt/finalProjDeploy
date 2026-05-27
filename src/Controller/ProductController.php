@@ -9,6 +9,7 @@ use App\Entity\StockLog;
 use App\Service\ActivityLogService;
 use App\Service\ProductImageUploader;
 use App\Service\StockLogService;
+use App\Service\WebSocketNotifier;
 use Doctrine\DBAL\Exception\ForeignKeyConstraintViolationException;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -27,6 +28,7 @@ final class ProductController extends AbstractController
         private ActivityLogService $activityLogService,
         private StockLogService $stockLogService,
         private ProductImageUploader $productImageUploader,
+        private WebSocketNotifier $webSocketNotifier,
     ) {
     }
     #[Route(name: 'app_product_index', methods: ['GET'])]
@@ -113,6 +115,19 @@ final class ProductController extends AbstractController
 
             // Log the action
             $this->activityLogService->logProductCreate($product);
+
+            $pid = $product->getId();
+            if ($pid !== null) {
+                $this->webSocketNotifier->notifyRoom(
+                    'catalog',
+                    'catalog.updated',
+                    [
+                        'productId' => $pid,
+                        'quantity' => (int) $product->getQuantity(),
+                        'removed' => false,
+                    ],
+                );
+            }
 
             $this->addFlash('success', 'Product saved successfully.');
 
@@ -211,6 +226,19 @@ final class ProductController extends AbstractController
         // Log the action
         $this->activityLogService->logProductUpdate($product);
 
+        $pid = $product->getId();
+        if ($pid !== null) {
+            $this->webSocketNotifier->notifyRoom(
+                'catalog',
+                'catalog.updated',
+                [
+                    'productId' => $pid,
+                    'quantity' => (int) $product->getQuantity(),
+                    'removed' => false,
+                ],
+            );
+        }
+
         $this->addFlash('success', 'Product updated successfully.');
 
         // Redirect to admin route if user is admin/staff
@@ -258,12 +286,23 @@ final class ProductController extends AbstractController
     }
 
     if ($this->isCsrfTokenValid('delete'.$product->getId(), $request->getPayload()->getString('_token'))) {
+        $deletedId = $product->getId();
         // Log the action before deletion
         $this->activityLogService->logProductDelete($product);
 
         try {
             $entityManager->remove($product);
             $entityManager->flush();
+            if ($deletedId !== null) {
+                $this->webSocketNotifier->notifyRoom(
+                    'catalog',
+                    'catalog.updated',
+                    [
+                        'productId' => $deletedId,
+                        'removed' => true,
+                    ],
+                );
+            }
             $this->addFlash('success', 'Product deleted successfully.');
         } catch (ForeignKeyConstraintViolationException) {
             $this->addFlash('error', 'This product cannot be deleted because it is already used in existing orders.');
