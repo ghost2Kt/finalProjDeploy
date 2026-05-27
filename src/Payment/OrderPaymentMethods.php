@@ -66,14 +66,28 @@ final class OrderPaymentMethods
 
     public static function resolveStatus(Order $order): string
     {
-        $stored = trim((string) $order->getPaymentMethod());
-        if ($stored !== '') {
-            return trim((string) ($order->getStatus() ?? 'Pending')) ?: 'Pending';
+        $statusRaw = trim((string) ($order->getStatus() ?? ''));
+        $paymentLabel = trim((string) $order->getPaymentMethod());
+
+        // If someone explicitly set a non-pending status in the DB, keep it.
+        if ($statusRaw !== '' && strcasecmp($statusRaw, 'Pending') !== 0) {
+            return $statusRaw;
         }
 
-        [$status] = self::parseLegacyStatus($order->getStatus() ?? 'Pending');
+        // Older rows may store payment inside the status text (e.g. "Pending · GCash").
+        if ($paymentLabel === '') {
+            [$legacyStatus, $legacyPayment] = self::parseLegacyStatus($statusRaw !== '' ? $statusRaw : 'Pending');
+            $paymentLabel = $legacyPayment;
+            $statusRaw = $legacyStatus;
+        }
 
-        return $status !== '' ? $status : 'Pending';
+        $paymentKey = strtolower(trim($paymentLabel));
+        if ($paymentKey === '' || $paymentKey === strtolower(self::METHODS['cod'])) {
+            return 'Pending';
+        }
+
+        // Demo rule: prepaid methods are treated as Paid.
+        return 'Paid';
     }
 
     /**

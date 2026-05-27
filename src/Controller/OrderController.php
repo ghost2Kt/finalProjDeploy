@@ -5,6 +5,7 @@ namespace App\Controller;
 use App\Entity\Order;
 use App\Entity\OrderItem;
 use App\Form\OrderType;
+use App\Payment\OrderPaymentMethods;
 use App\Repository\OrderRepository;
 use App\Entity\StockLog;
 use App\Service\ActivityLogService;
@@ -41,9 +42,11 @@ final class OrderController extends AbstractController
         $totalOrders = count($orders);
         $totalRevenue = 0.0;
         $customers = [];
+        $displayStatus = [];
         foreach ($orders as $order) {
             $totalRevenue += (float)$order->getTotal();
             $customers[] = strtolower(trim((string)$order->getCustomerEmail()));
+            $displayStatus[$order->getId()] = OrderPaymentMethods::resolveStatus($order);
         }
         $uniqueCustomers = count(array_unique(array_filter($customers)));
 
@@ -52,6 +55,7 @@ final class OrderController extends AbstractController
             'totalOrders' => $totalOrders,
             'totalRevenue' => number_format($totalRevenue, 2, '.', ''),
             'uniqueCustomers' => $uniqueCustomers,
+            'displayStatus' => $displayStatus,
         ]);
     }
 
@@ -167,6 +171,7 @@ final class OrderController extends AbstractController
 
         return $this->render('admin/orders/show.html.twig', [
             'order' => $order,
+            'displayStatus' => OrderPaymentMethods::resolveStatus($order),
         ]);
     }
 

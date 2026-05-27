@@ -201,7 +201,7 @@
                     <td>{{ order.customerEmail }}</td>
                     <td>{{ order.customerPhone }}</td>
                     <td>{{ order.orderDate|date('M d, Y H:i') }}</td>
-                    <td>{{ order.status }}</td>
+                    <td>{{ displayStatus[order.id] ?? order.status }}</td>
                     <td>{{ order.paymentMethod ?: '—' }}</td>
                     <td>₱{{ order.total }}</td>
                     <td class="table-actions">
