@@ -5,6 +5,8 @@
 # https://symfony.com/doc/current/best_practices.html#use-parameters-for-application-configuration
 parameters:
     uploads_directory: "%kernel.project_dir%/public/uploads"
+    app.websocket_broadcast_url_default: ''
+    app.websocket_internal_key_default: ''
 
 services:
     # default configuration for services in *this* file
@@ -34,3 +36,8 @@ services:
     App\Service\ProductImageUploader:
         arguments:
             $uploadsDirectory: '%uploads_directory%'
+
+    App\Service\WebSocketNotifier:
+        arguments:
+            $broadcastUrl: '%env(default:app.websocket_broadcast_url_default:WEBSOCKET_BROADCAST_URL)%'
+            $internalKey: '%env(default:app.websocket_internal_key_default:WEBSOCKET_INTERNAL_KEY)%'

@@ -29,6 +29,7 @@ final class ApiCartService
         private EntityManagerInterface $entityManager,
         private ActivityLogService $activityLogService,
         private CacheItemPoolInterface $cache,
+        private WebSocketNotifier $webSocketNotifier,
     ) {
     }
 
@@ -336,6 +337,18 @@ final class ApiCartService
         );
 
         $userId = $user->getId();
+        if ($userId !== null) {
+            $this->webSocketNotifier->notifyUser(
+                $userId,
+                'order.updated',
+                [
+                    'orderId' => $order->getId(),
+                    'orderNumber' => $order->getOrderNumber(),
+                    'status' => $order->getStatus(),
+                ],
+            );
+        }
+
         if ($userId !== null) {
             $this->writeCart($userId, []);
         }
