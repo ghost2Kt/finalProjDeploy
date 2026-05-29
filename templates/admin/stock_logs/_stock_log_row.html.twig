@@ -1,0 +1,43 @@
+<tr data-log-id="{{ log.id }}" class="logs-table-row">
+    <td>{{ log.id }}</td>
+    <td>
+        <strong>{{ log.productName }}</strong>
+        {% if log.product %}
+            <span class="text-muted" style="display:block;font-size:0.85rem;">#{{ log.product.id }}</span>
+        {% endif %}
+    </td>
+    <td><span class="email-badge">{{ log.username }}</span></td>
+    <td>
+        {% if log.role == 'Admin' %}
+            <span class="badge badge-admin">{{ log.role }}</span>
+        {% elseif log.role == 'Staff' %}
+            <span class="badge badge-staff">{{ log.role }}</span>
+        {% else %}
+            <span class="badge badge-user">{{ log.role }}</span>
+        {% endif %}
+    </td>
+    <td>
+        {% if log.changeType == 'initial' %}
+            <span class="action-badge action-create"><i class="bi bi-plus-circle"></i> Initial</span>
+        {% elseif log.changeType == 'adjustment' %}
+            <span class="action-badge action-update"><i class="bi bi-pencil"></i> Adjustment</span>
+        {% elseif log.changeType == 'order' %}
+            <span class="action-badge action-delete"><i class="bi bi-cart-dash"></i> Order</span>
+        {% else %}
+            <span class="action-badge">{{ log.changeType }}</span>
+        {% endif %}
+    </td>
+    <td>{{ log.previousQuantity }}</td>
+    <td>{{ log.newQuantity }}</td>
+    <td>
+        {% if log.quantityChange > 0 %}
+            <span class="badge" style="background:#16a34a;color:#fff;">+{{ log.quantityChange }}</span>
+        {% elseif log.quantityChange < 0 %}
+            <span class="badge" style="background:#dc2626;color:#fff;">{{ log.quantityChange }}</span>
+        {% else %}
+            <span class="text-muted">0</span>
+        {% endif %}
+    </td>
+    <td>{{ log.note ?? '—' }}</td>
+    <td><span class="timestamp">{{ log.createdAt|date('Y-m-d H:i:s') }}</span></td>
+</tr>

@@ -1,0 +1,147 @@
+{# Live activity logs: WebSocket (when configured) + polling fallback. #}
+<script src="https://cdn.socket.io/4.7.5/socket.io.min.js" crossorigin="anonymous"></script>
+<script>
+{% verbatim %}
+function initAdminActivityLogsLive() {
+  const table = document.getElementById('logsTable');
+  if (!table || table.dataset.liveInit === '1') return;
+  if (table.getAttribute('data-live-enabled') !== '1') return;
+  table.dataset.liveInit = '1';
+
+  const pollUrl = table.getAttribute('data-poll-url') || '/admin/logs/live/poll';
+  const rowUrlBase = table.getAttribute('data-row-url-base') || '/admin/logs/live/row/';
+  const wsConfigUrl = table.getAttribute('data-ws-config-url') || '/admin/orders/live/ws-config';
+  const totalBadge = document.getElementById('logsTotalBadge');
+
+  const tbody = table.querySelector('tbody');
+  const knownIds = new Set();
+  tbody.querySelectorAll('tr[data-log-id]').forEach((tr) => {
+    const id = tr.getAttribute('data-log-id');
+    if (id) knownIds.add(id);
+  });
+
+  let maxLogId = 0;
+  knownIds.forEach((id) => {
+    const n = parseInt(id, 10);
+    if (!Number.isNaN(n) && n > maxLogId) maxLogId = n;
+  });
+
+  function updateTotal(totalLogs) {
+    if (totalBadge && totalLogs !== undefined && totalLogs !== null) {
+      totalBadge.textContent = 'Total: ' + totalLogs;
+    }
+  }
+
+  function ingestRow(payload) {
+    if (!payload || !payload.logId || !payload.html) return;
+    const id = String(payload.logId);
+    if (knownIds.has(id)) return;
+
+    const noData = tbody.querySelector('tr .no-data');
+    if (noData) noData.closest('tr')?.remove();
+
+    if (window.agriNestLogsTable && typeof window.agriNestLogsTable.addRowFromHtml === 'function') {
+      window.agriNestLogsTable.addRowFromHtml(payload.html);
+    } else {
+      const temp = document.createElement('tbody');
+      temp.innerHTML = payload.html.trim();
+      const tr = temp.querySelector('tr');
+      if (tr) tbody.insertBefore(tr, tbody.firstChild);
+    }
+
+    knownIds.add(id);
+    const n = parseInt(id, 10);
+    if (!Number.isNaN(n) && n > maxLogId) maxLogId = n;
+
+    const row = tbody.querySelector('tr[data-log-id="' + id + '"]');
+    if (row) {
+      row.classList.add('logs-row--new');
+      setTimeout(() => row.classList.remove('logs-row--new'), 4000);
+    }
+
+    updateTotal(payload.totalLogs);
+  }
+
+  async function fetchRow(logId) {
+    try {
+      const res = await fetch(rowUrlBase + logId, {
+        credentials: 'same-origin',
+        headers: { Accept: 'application/json' },
+      });
+      if (!res.ok) return;
+      ingestRow(await res.json());
+    } catch (_) {
+      /* optional live updates */
+    }
+  }
+
+  async function poll() {
+    try {
+      const res = await fetch(pollUrl + '?afterId=' + maxLogId, {
+        credentials: 'same-origin',
+        headers: { Accept: 'application/json' },
+      });
+      if (!res.ok) return;
+      const data = await res.json();
+      (data.logs || []).forEach(ingestRow);
+      updateTotal(data.totalLogs);
+    } catch (_) {
+      /* optional live updates */
+    }
+  }
+
+  async function connectSocket() {
+    try {
+      const res = await fetch(wsConfigUrl, {
+        credentials: 'same-origin',
+        headers: { Accept: 'application/json' },
+      });
+      if (!res.ok) return;
+      const cfg = await res.json();
+      if (!cfg.enabled || !cfg.origin || !cfg.token || typeof io === 'undefined') return;
+
+      const socket = io(cfg.origin, {
+        transports: ['websocket'],
+        auth: { token: cfg.token },
+        reconnection: true,
+        reconnectionAttempts: 8,
+      });
+
+      const joinRooms = () => {
+        socket.emit('join-room', 'admin:orders');
+        socket.emit('join', 'admin:orders');
+        socket.emit('join-room', 'catalog');
+        socket.emit('join', 'catalog');
+      };
+
+      socket.on('connect', joinRooms);
+      socket.on('order.created', poll);
+      socket.on('order.updated', poll);
+      socket.on('catalog.updated', poll);
+      socket.on('catalog_update', poll);
+      socket.on('product.updated', poll);
+      socket.on('stock.updated', poll);
+    } catch (_) {
+      /* polling still runs */
+    }
+  }
+
+  connectSocket();
+  poll();
+  setInterval(poll, 5000);
+}
+
+document.addEventListener('DOMContentLoaded', initAdminActivityLogsLive);
+document.addEventListener('turbo:load', initAdminActivityLogsLive);
+document.addEventListener('turbo:render', initAdminActivityLogsLive);
+{% endverbatim %}
+</script>
+<style>
+  #logsTable tr.logs-row--new {
+    animation: logs-row-highlight 4s ease-out;
+  }
+  @keyframes logs-row-highlight {
+    0% { background-color: rgba(255, 206, 84, 0.45); }
+    100% { background-color: transparent; }
+  }
+</style>

@@ -1,0 +1,44 @@
+<div class="timeline-item" data-log-id="{{ log.id }}">
+  <div class="timeline-marker">
+    {% if log.quantityChange > 0 %}
+      <div class="marker-icon marker-create">
+        <i class="bi bi-plus-circle"></i>
+      </div>
+    {% else %}
+      <div class="marker-icon marker-delete">
+        <i class="bi bi-dash-circle"></i>
+      </div>
+    {% endif %}
+  </div>
+  <div class="timeline-content">
+    <div class="log-main-info">
+      <div class="log-user-info">
+        <span class="log-email">{{ log.username }}</span>
+        {% if log.role == 'Admin' %}
+          <span class="badge badge-admin">{{ log.role }}</span>
+        {% elseif log.role == 'Staff' %}
+          <span class="badge badge-staff">{{ log.role }}</span>
+        {% else %}
+          <span class="badge badge-user">{{ log.role }}</span>
+        {% endif %}
+      </div>
+      <div class="log-action-info">
+        <span class="log-entity">{{ log.productName }}</span>
+        <span class="log-action-badge log-action-{{ log.quantityChange > 0 ? 'create' : 'delete' }}">
+          {% if log.quantityChange > 0 %}+{% endif %}{{ log.quantityChange }}
+          ({{ log.previousQuantity }} → {{ log.newQuantity }})
+        </span>
+      </div>
+    </div>
+    <div class="log-time">
+      <i class="bi bi-clock"></i>
+      <span>{{ log.createdAt|date('M d, Y') }}</span>
+      <span class="time-separator">•</span>
+      <span>{{ log.createdAt|date('H:i:s') }}</span>
+      {% if log.note %}
+        <span class="time-separator">•</span>
+        <span>{{ log.note }}</span>
+      {% endif %}
+    </div>
+  </div>
+</div>

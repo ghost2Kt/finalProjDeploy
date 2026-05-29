@@ -1,4 +1,4 @@
-{# Live dashboard stats: WebSocket (when configured) + polling fallback. #}
+{# Live admin dashboard: stats + recent timelines (WebSocket + polling). #}
 <script src="https://cdn.socket.io/4.7.5/socket.io.min.js" crossorigin="anonymous"></script>
 <script>
 {% verbatim %}
@@ -20,6 +20,37 @@ function initAdminDashboardLive() {
     totalOrders: document.getElementById('dashStatOrders'),
   };
 
+  const activityTimeline = document.getElementById('dashboardActivityTimeline');
+  const stockTimeline = document.getElementById('dashboardStockTimeline');
+  const activityBadge = document.getElementById('dashboardActivityBadge');
+  const stockBadge = document.getElementById('dashboardStockBadge');
+  const RECENT_LIMIT = 10;
+
+  const knownActivityIds = new Set();
+  const knownStockIds = new Set();
+  let maxActivityId = 0;
+  let maxStockId = 0;
+
+  if (activityTimeline) {
+    activityTimeline.querySelectorAll('[data-log-id]').forEach((el) => {
+      const id = el.getAttribute('data-log-id');
+      if (!id) return;
+      knownActivityIds.add(id);
+      const n = parseInt(id, 10);
+      if (!Number.isNaN(n) && n > maxActivityId) maxActivityId = n;
+    });
+  }
+
+  if (stockTimeline) {
+    stockTimeline.querySelectorAll('[data-log-id]').forEach((el) => {
+      const id = el.getAttribute('data-log-id');
+      if (!id) return;
+      knownStockIds.add(id);
+      const n = parseInt(id, 10);
+      if (!Number.isNaN(n) && n > maxStockId) maxStockId = n;
+    });
+  }
+
   function applyStats(stats) {
     if (!stats) return;
     Object.keys(statEls).forEach((key) => {
@@ -30,15 +61,62 @@ function initAdminDashboardLive() {
     });
   }
 
+  function prependTimelineItem(timeline, payload, knownIds, badgeEl) {
+    if (!timeline || !payload || !payload.logId || !payload.html) return;
+    const id = String(payload.logId);
+    if (knownIds.has(id)) return;
+
+    const empty = timeline.querySelector('.no-logs');
+    if (empty) empty.remove();
+
+    const temp = document.createElement('div');
+    temp.innerHTML = payload.html.trim();
+    const item = temp.firstElementChild;
+    if (!item) return;
+
+    timeline.insertBefore(item, timeline.firstChild);
+    knownIds.add(id);
+    item.classList.add('timeline-item--new');
+    setTimeout(() => item.classList.remove('timeline-item--new'), 4000);
+
+    while (timeline.querySelectorAll('[data-log-id]').length > RECENT_LIMIT) {
+      const last = timeline.querySelector('[data-log-id]:last-of-type');
+      if (last) last.remove();
+    }
+
+    if (badgeEl) {
+      const count = timeline.querySelectorAll('[data-log-id]').length;
+      badgeEl.textContent = count + ' recent';
+    }
+  }
+
+  function ingestTimelineItems(items, timeline, knownIds, badgeEl) {
+    (items || []).forEach((payload) => {
+      prependTimelineItem(timeline, payload, knownIds, badgeEl);
+      const n = parseInt(String(payload.logId), 10);
+      if (Number.isNaN(n)) return;
+      if (timeline === activityTimeline && n > maxActivityId) maxActivityId = n;
+      if (timeline === stockTimeline && n > maxStockId) maxStockId = n;
+    });
+  }
+
   async function poll() {
     try {
-      const res = await fetch(pollUrl, {
+      let url = pollUrl;
+      const params = [];
+      if (activityTimeline) params.push('afterActivityId=' + maxActivityId);
+      if (stockTimeline) params.push('afterStockId=' + maxStockId);
+      if (params.length) url += (url.includes('?') ? '&' : '?') + params.join('&');
+
+      const res = await fetch(url, {
         credentials: 'same-origin',
         headers: { Accept: 'application/json' },
       });
       if (!res.ok) return;
       const data = await res.json();
       applyStats(data);
+      ingestTimelineItems(data.activityLogs, activityTimeline, knownActivityIds, activityBadge);
+      ingestTimelineItems(data.stockLogs, stockTimeline, knownStockIds, stockBadge);
     } catch (_) {
       /* optional live updates */
     }
@@ -90,3 +168,12 @@ document.addEventListener('turbo:load', initAdminDashboardLive);
 document.addEventListener('turbo:render', initAdminDashboardLive);
 {% endverbatim %}
 </script>
+<style>
+  .timeline-item--new {
+    animation: dashboard-timeline-highlight 4s ease-out;
+  }
+  @keyframes dashboard-timeline-highlight {
+    0% { background-color: rgba(255, 206, 84, 0.35); border-radius: 12px; }
+    100% { background-color: transparent; }
+  }
+</style>

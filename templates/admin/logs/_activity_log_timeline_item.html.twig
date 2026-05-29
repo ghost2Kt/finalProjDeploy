@@ -1,0 +1,55 @@
+<div class="timeline-item" data-log-id="{{ log.id }}">
+  <div class="timeline-marker">
+    {% if log.action == 'Create' %}
+      <div class="marker-icon marker-create">
+        <i class="bi bi-plus-circle"></i>
+      </div>
+    {% elseif log.action == 'Update' %}
+      <div class="marker-icon marker-update">
+        <i class="bi bi-pencil"></i>
+      </div>
+    {% elseif log.action == 'Delete' %}
+      <div class="marker-icon marker-delete">
+        <i class="bi bi-trash"></i>
+      </div>
+    {% elseif log.action == 'Login' %}
+      <div class="marker-icon marker-login">
+        <i class="bi bi-box-arrow-in-right"></i>
+      </div>
+    {% elseif log.action == 'Logout' %}
+      <div class="marker-icon marker-logout">
+        <i class="bi bi-box-arrow-right"></i>
+      </div>
+    {% else %}
+      <div class="marker-icon">
+        <i class="bi bi-circle"></i>
+      </div>
+    {% endif %}
+  </div>
+  <div class="timeline-content">
+    <div class="log-main-info">
+      <div class="log-user-info">
+        <span class="log-email">{{ log.username }}</span>
+        {% if log.role == 'Admin' %}
+          <span class="badge badge-admin">{{ log.role }}</span>
+        {% elseif log.role == 'Staff' %}
+          <span class="badge badge-staff">{{ log.role }}</span>
+        {% else %}
+          <span class="badge badge-user">{{ log.role }}</span>
+        {% endif %}
+      </div>
+      <div class="log-action-info">
+        <span class="log-action-badge log-action-{{ log.action|lower }}">{{ log.action }}</span>
+        {% if log.entityType %}
+          <span class="log-entity">{{ log.entityType }}{% if log.entityId %} #{{ log.entityId }}{% endif %}</span>
+        {% endif %}
+      </div>
+    </div>
+    <div class="log-time">
+      <i class="bi bi-clock"></i>
+      <span>{{ log.timestamp|date('M d, Y') }}</span>
+      <span class="time-separator">•</span>
+      <span>{{ log.timestamp|date('H:i:s') }}</span>
+    </div>
+  </div>
+</div>

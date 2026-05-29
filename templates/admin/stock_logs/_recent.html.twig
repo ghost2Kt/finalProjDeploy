@@ -1,8 +1,8 @@
-<div class="dashboard-section">
+<div class="dashboard-section" id="dashboardStockSection">
   <div class="section-header">
     <div class="section-title-wrapper">
       <h2><i class="bi bi-box-seam"></i> Recent Stock Changes</h2>
-      <span class="section-badge">{{ recentStockLogs|length }} recent</span>
+      <span class="section-badge" id="dashboardStockBadge">{{ recentStockLogs|length }} recent</span>
     </div>
     <a href="{{ path('app_admin_stock_logs_index') }}" class="view-all-link">
       View All <i class="bi bi-arrow-right"></i>
@@ -11,61 +11,20 @@
 
   <div class="logs-card">
     {% if recentStockLogs|length > 0 %}
-      <div class="logs-timeline">
+      <div class="logs-timeline" id="dashboardStockTimeline">
         {% for log in recentStockLogs %}
-          <div class="timeline-item">
-            <div class="timeline-marker">
-              {% if log.quantityChange > 0 %}
-                <div class="marker-icon marker-create">
-                  <i class="bi bi-plus-circle"></i>
-                </div>
-              {% else %}
-                <div class="marker-icon marker-delete">
-                  <i class="bi bi-dash-circle"></i>
-                </div>
-              {% endif %}
-            </div>
-            <div class="timeline-content">
-              <div class="log-main-info">
-                <div class="log-user-info">
-                  <span class="log-email">{{ log.username }}</span>
-                  {% if log.role == 'Admin' %}
-                    <span class="badge badge-admin">{{ log.role }}</span>
-                  {% elseif log.role == 'Staff' %}
-                    <span class="badge badge-staff">{{ log.role }}</span>
-                  {% else %}
-                    <span class="badge badge-user">{{ log.role }}</span>
-                  {% endif %}
-                </div>
-                <div class="log-action-info">
-                  <span class="log-entity">{{ log.productName }}</span>
-                  <span class="log-action-badge log-action-{{ log.quantityChange > 0 ? 'create' : 'delete' }}">
-                    {% if log.quantityChange > 0 %}+{% endif %}{{ log.quantityChange }}
-                    ({{ log.previousQuantity }} → {{ log.newQuantity }})
-                  </span>
-                </div>
-              </div>
-              <div class="log-time">
-                <i class="bi bi-clock"></i>
-                <span>{{ log.createdAt|date('M d, Y') }}</span>
-                <span class="time-separator">•</span>
-                <span>{{ log.createdAt|date('H:i:s') }}</span>
-                {% if log.note %}
-                  <span class="time-separator">•</span>
-                  <span>{{ log.note }}</span>
-                {% endif %}
-              </div>
-            </div>
-          </div>
+          {% include 'admin/stock_logs/_stock_log_timeline_item.html.twig' %}
         {% endfor %}
       </div>
     {% else %}
-      <div class="no-logs">
-        <div class="no-logs-icon">
-          <i class="bi bi-inbox"></i>
+      <div class="logs-timeline" id="dashboardStockTimeline">
+        <div class="no-logs">
+          <div class="no-logs-icon">
+            <i class="bi bi-inbox"></i>
+          </div>
+          <p>No stock changes recorded yet.</p>
+          <span class="no-logs-subtitle">Stock updates appear when products are edited or orders deduct inventory.</span>
         </div>
-        <p>No stock changes recorded yet.</p>
-        <span class="no-logs-subtitle">Stock updates appear when products are edited or orders deduct inventory.</span>
       </div>
     {% endif %}
   </div>

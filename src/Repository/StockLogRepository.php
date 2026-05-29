@@ -27,4 +27,18 @@ class StockLogRepository extends ServiceEntityRepository
             ->getQuery()
             ->getResult();
     }
+
+    /**
+     * @return StockLog[]
+     */
+    public function findNewerThanId(int $afterId, int $limit = 50): array
+    {
+        return $this->createQueryBuilder('s')
+            ->andWhere('s.id > :afterId')
+            ->setParameter('afterId', $afterId)
+            ->orderBy('s.id', 'ASC')
+            ->setMaxResults($limit)
+            ->getQuery()
+            ->getResult();
+    }
 }

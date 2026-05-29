@@ -1,0 +1,62 @@
+<tr data-log-id="{{ log.id }}" class="logs-table-row">
+    <td>{{ log.id }}</td>
+    <td>
+        <span class="email-badge">{{ log.username }}</span>
+    </td>
+    <td>
+        {% if log.role == 'Admin' %}
+            <span class="badge badge-admin">{{ log.role }}</span>
+        {% elseif log.role == 'Staff' %}
+            <span class="badge badge-staff">{{ log.role }}</span>
+        {% else %}
+            <span class="badge badge-user">{{ log.role }}</span>
+        {% endif %}
+    </td>
+    <td>
+        {% if log.action == 'Create' %}
+            <span class="action-badge action-create">
+                <i class="bi bi-plus-circle"></i> {{ log.action }}
+            </span>
+        {% elseif log.action == 'Update' %}
+            <span class="action-badge action-update">
+                <i class="bi bi-pencil"></i> {{ log.action }}
+            </span>
+        {% elseif log.action == 'Delete' %}
+            <span class="action-badge action-delete">
+                <i class="bi bi-trash"></i> {{ log.action }}
+            </span>
+        {% elseif log.action == 'Login' %}
+            <span class="action-badge action-login">
+                <i class="bi bi-box-arrow-in-right"></i> {{ log.action }}
+            </span>
+        {% elseif log.action == 'Logout' %}
+            <span class="action-badge action-logout">
+                <i class="bi bi-box-arrow-right"></i> {{ log.action }}
+            </span>
+        {% else %}
+            <span class="action-badge">{{ log.action }}</span>
+        {% endif %}
+    </td>
+    <td>
+        {% if log.entityType %}
+            <span class="entity-badge">{{ log.entityType }}{% if log.entityId %} #{{ log.entityId }}{% endif %}</span>
+        {% else %}
+            <span class="text-muted">-</span>
+        {% endif %}
+    </td>
+    <td class="details-cell">
+        {% if log.details %}
+            <button type="button" class="btn-details" onclick="toggleDetails({{ log.id }})">
+                <i class="bi bi-eye"></i> View Details
+            </button>
+            <div id="details-{{ log.id }}" class="details-content" style="display: none;">
+                <pre>{{ log.details }}</pre>
+            </div>
+        {% else %}
+            <span class="text-muted">-</span>
+        {% endif %}
+    </td>
+    <td>
+        <span class="timestamp">{{ log.timestamp|date('Y-m-d H:i:s') }}</span>
+    </td>
+</tr>

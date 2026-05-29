@@ -90,6 +90,20 @@ document.addEventListener("DOMContentLoaded", function () {
         render();
     });
 
+    window.agriNestLogsTable = {
+        addRowFromHtml(html) {
+            const temp = document.createElement("tbody");
+            temp.innerHTML = html.trim();
+            const tr = temp.querySelector("tr");
+            if (!tr) return;
+            tbody.insertBefore(tr, tbody.firstChild);
+            rows.unshift(tr);
+            filteredRows = rows.slice();
+            currentPage = 1;
+            render();
+        },
+    };
+
     render();
 });
 {% endverbatim %}
