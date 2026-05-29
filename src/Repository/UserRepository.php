@@ -16,28 +16,35 @@ class UserRepository extends ServiceEntityRepository
         parent::__construct($registry, User::class);
     }
 
-    //    /**
-    //     * @return User[] Returns an array of User objects
-    //     */
-    //    public function findByExampleField($value): array
-    //    {
-    //        return $this->createQueryBuilder('u')
-    //            ->andWhere('u.exampleField = :val')
-    //            ->setParameter('val', $value)
-    //            ->orderBy('u.id', 'ASC')
-    //            ->setMaxResults(10)
-    //            ->getQuery()
-    //            ->getResult()
-    //        ;
-    //    }
+    /**
+     * @return User[]
+     */
+    public function findNewerThanId(int $afterId, string $role = 'all', int $limit = 50): array
+    {
+        $qb = $this->createQueryBuilder('u')
+            ->andWhere('u.id > :afterId')
+            ->setParameter('afterId', $afterId)
+            ->orderBy('u.id', 'ASC')
+            ->setMaxResults($limit);
 
-    //    public function findOneBySomeField($value): ?User
-    //    {
-    //        return $this->createQueryBuilder('u')
-    //            ->andWhere('u.exampleField = :val')
-    //            ->setParameter('val', $value)
-    //            ->getQuery()
-    //            ->getOneOrNullResult()
-    //        ;
-    //    }
+        $this->applyRoleFilter($qb, $role);
+
+        return $qb->getQuery()->getResult();
+    }
+
+    private function applyRoleFilter(\Doctrine\ORM\QueryBuilder $qb, string $role): void
+    {
+        if ($role === 'admin') {
+            $qb->andWhere('u.roles LIKE :role')
+                ->setParameter('role', '%ROLE_ADMIN%');
+        } elseif ($role === 'staff') {
+            $qb->andWhere('u.roles LIKE :role')
+                ->setParameter('role', '%ROLE_STAFF%');
+        } elseif ($role === 'user') {
+            $qb->andWhere('u.roles NOT LIKE :adminRole')
+                ->andWhere('u.roles NOT LIKE :staffRole')
+                ->setParameter('adminRole', '%ROLE_ADMIN%')
+                ->setParameter('staffRole', '%ROLE_STAFF%');
+        }
+    }
 }

@@ -1,0 +1,164 @@
+{# Live admin users: WebSocket (when configured) + polling fallback. #}
+<script src="https://cdn.socket.io/4.7.5/socket.io.min.js" crossorigin="anonymous"></script>
+<script>
+{% verbatim %}
+function initAdminUsersLive() {
+  const table = document.getElementById('usersTable');
+  if (!table || table.dataset.liveInit === '1') return;
+  table.dataset.liveInit = '1';
+
+  const pollUrl = table.getAttribute('data-poll-url') || '/admin/users/live/poll';
+  const rowUrlBase = table.getAttribute('data-row-url-base') || '/admin/users/live/row/';
+  const wsConfigUrl = table.getAttribute('data-ws-config-url') || '/admin/orders/live/ws-config';
+  const role = table.getAttribute('data-role-filter') || 'all';
+  const searchInput = document.getElementById('tableSearch');
+
+  const tbody = table.querySelector('tbody');
+  const knownIds = new Set();
+  tbody.querySelectorAll('tr[data-user-id]').forEach((tr) => {
+    const id = tr.getAttribute('data-user-id');
+    if (id) knownIds.add(id);
+  });
+
+  let maxUserId = 0;
+  knownIds.forEach((id) => {
+    const n = parseInt(id, 10);
+    if (!Number.isNaN(n) && n > maxUserId) maxUserId = n;
+  });
+
+  function isLiveEnabled() {
+    if (table.getAttribute('data-live-enabled') !== '1') return false;
+    if (searchInput && searchInput.value.trim() !== '') return false;
+    return true;
+  }
+
+  function ingestRow(payload, isUpdate) {
+    if (!payload || !payload.userId || !payload.html) return;
+    const id = String(payload.userId);
+    const existing = tbody.querySelector('tr[data-user-id="' + id + '"]');
+
+    if (isUpdate && existing) {
+      const temp = document.createElement('tbody');
+      temp.innerHTML = payload.html.trim();
+      const tr = temp.querySelector('tr');
+      if (tr) existing.replaceWith(tr);
+      if (window.agriNestUsersTable && typeof window.agriNestUsersTable.syncRow === 'function') {
+        window.agriNestUsersTable.syncRow(tr || existing);
+      }
+      return;
+    }
+
+    if (knownIds.has(id)) return;
+
+    const noData = tbody.querySelector('tr .no-data');
+    if (noData) noData.closest('tr')?.remove();
+
+    if (window.agriNestUsersTable && typeof window.agriNestUsersTable.addRowFromHtml === 'function') {
+      window.agriNestUsersTable.addRowFromHtml(payload.html);
+    } else {
+      const temp = document.createElement('tbody');
+      temp.innerHTML = payload.html.trim();
+      const tr = temp.querySelector('tr');
+      if (tr) tbody.insertBefore(tr, tbody.firstChild);
+    }
+
+    knownIds.add(id);
+    const n = parseInt(id, 10);
+    if (!Number.isNaN(n) && n > maxUserId) maxUserId = n;
+
+    const row = tbody.querySelector('tr[data-user-id="' + id + '"]');
+    if (row) {
+      row.classList.add('users-row--new');
+      setTimeout(() => row.classList.remove('users-row--new'), 4000);
+    }
+  }
+
+  function removeRow(userId) {
+    const id = String(userId);
+    const row = tbody.querySelector('tr[data-user-id="' + id + '"]');
+    if (!row) return;
+    row.remove();
+    knownIds.delete(id);
+    if (window.agriNestUsersTable && typeof window.agriNestUsersTable.removeRow === 'function') {
+      window.agriNestUsersTable.removeRow(id);
+    }
+  }
+
+  function collectWatchIds() {
+    const ids = [];
+    tbody.querySelectorAll('tr[data-user-id]').forEach((tr) => {
+      const id = tr.getAttribute('data-user-id');
+      if (id) ids.push(id);
+    });
+    return ids.join(',');
+  }
+
+  async function poll() {
+    if (!isLiveEnabled()) return;
+    try {
+      const watchIds = collectWatchIds();
+      let url = pollUrl + '?afterId=' + maxUserId + '&role=' + encodeURIComponent(role);
+      if (watchIds) url += '&watchIds=' + encodeURIComponent(watchIds);
+
+      const res = await fetch(url, {
+        credentials: 'same-origin',
+        headers: { Accept: 'application/json' },
+      });
+      if (!res.ok) return;
+      const data = await res.json();
+      (data.users || []).forEach((p) => ingestRow(p, false));
+      (data.updates || []).forEach((p) => ingestRow(p, true));
+      (data.removed || []).forEach(removeRow);
+    } catch (_) {
+      /* optional live updates */
+    }
+  }
+
+  async function connectSocket() {
+    try {
+      const res = await fetch(wsConfigUrl, {
+        credentials: 'same-origin',
+        headers: { Accept: 'application/json' },
+      });
+      if (!res.ok) return;
+      const cfg = await res.json();
+      if (!cfg.enabled || !cfg.origin || !cfg.token || typeof io === 'undefined') return;
+
+      const socket = io(cfg.origin, {
+        transports: ['websocket'],
+        auth: { token: cfg.token },
+        reconnection: true,
+        reconnectionAttempts: 8,
+      });
+
+      const joinRooms = () => {
+        socket.emit('join-room', 'admin:orders');
+        socket.emit('join', 'admin:orders');
+      };
+
+      socket.on('connect', joinRooms);
+      socket.on('order.created', poll);
+    } catch (_) {
+      /* polling still runs */
+    }
+  }
+
+  connectSocket();
+  poll();
+  setInterval(poll, 5000);
+}
+
+document.addEventListener('DOMContentLoaded', initAdminUsersLive);
+document.addEventListener('turbo:load', initAdminUsersLive);
+document.addEventListener('turbo:render', initAdminUsersLive);
+{% endverbatim %}
+</script>
+<style>
+  #usersTable tr.users-row--new {
+    animation: users-row-highlight 4s ease-out;
+  }
+  @keyframes users-row-highlight {
+    0% { background-color: rgba(255, 206, 84, 0.45); }
+    100% { background-color: transparent; }
+  }
+</style>

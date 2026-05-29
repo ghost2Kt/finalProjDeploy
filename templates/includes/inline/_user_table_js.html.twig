@@ -95,6 +95,40 @@ document.addEventListener("DOMContentLoaded", function () {
         render();
     });
 
+    window.agriNestUsersTable = {
+        addRowFromHtml(html) {
+            const temp = document.createElement("tbody");
+            temp.innerHTML = html.trim();
+            const tr = temp.querySelector("tr");
+            if (!tr) return;
+            tbody.insertBefore(tr, tbody.firstChild);
+            rows.unshift(tr);
+            filteredRows = rows.filter((r) => !r.querySelector(".no-data"));
+            currentPage = 1;
+            render();
+        },
+        syncRow(tr) {
+            if (!tr) return;
+            const id = tr.getAttribute("data-user-id");
+            const idx = rows.findIndex(
+                (r) => r.getAttribute("data-user-id") === id
+            );
+            if (idx >= 0) rows[idx] = tr;
+            else rows.unshift(tr);
+            filteredRows = rows.filter((r) => !r.querySelector(".no-data"));
+            render();
+        },
+        removeRow(userId) {
+            const id = String(userId);
+            const idx = rows.findIndex(
+                (r) => r.getAttribute("data-user-id") === id
+            );
+            if (idx >= 0) rows.splice(idx, 1);
+            filteredRows = rows.filter((r) => !r.querySelector(".no-data"));
+            render();
+        },
+    };
+
     render();
 });
 {% endverbatim %}
