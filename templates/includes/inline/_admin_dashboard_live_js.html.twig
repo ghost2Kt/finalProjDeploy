@@ -1,0 +1,92 @@
+{# Live dashboard stats: WebSocket (when configured) + polling fallback. #}
+<script src="https://cdn.socket.io/4.7.5/socket.io.min.js" crossorigin="anonymous"></script>
+<script>
+{% verbatim %}
+function initAdminDashboardLive() {
+  const grid = document.getElementById('dashboardStatsGrid');
+  if (!grid || grid.dataset.liveInit === '1') return;
+  grid.dataset.liveInit = '1';
+
+  const pollUrl = grid.getAttribute('data-poll-url');
+  const wsConfigUrl = grid.getAttribute('data-ws-config-url') || '/admin/orders/live/ws-config';
+  if (!pollUrl) return;
+
+  const statEls = {
+    totalUsers: document.getElementById('dashStatUsers'),
+    totalStaff: document.getElementById('dashStatStaff'),
+    totalProducts: document.getElementById('dashStatProducts'),
+    totalCategories: document.getElementById('dashStatCategories'),
+    totalSuppliers: document.getElementById('dashStatSuppliers'),
+    totalOrders: document.getElementById('dashStatOrders'),
+  };
+
+  function applyStats(stats) {
+    if (!stats) return;
+    Object.keys(statEls).forEach((key) => {
+      const el = statEls[key];
+      if (el && stats[key] !== undefined && stats[key] !== null) {
+        el.textContent = String(stats[key]);
+      }
+    });
+  }
+
+  async function poll() {
+    try {
+      const res = await fetch(pollUrl, {
+        credentials: 'same-origin',
+        headers: { Accept: 'application/json' },
+      });
+      if (!res.ok) return;
+      const data = await res.json();
+      applyStats(data);
+    } catch (_) {
+      /* optional live updates */
+    }
+  }
+
+  async function connectSocket() {
+    try {
+      const res = await fetch(wsConfigUrl, {
+        credentials: 'same-origin',
+        headers: { Accept: 'application/json' },
+      });
+      if (!res.ok) return;
+      const cfg = await res.json();
+      if (!cfg.enabled || !cfg.origin || !cfg.token || typeof io === 'undefined') return;
+
+      const socket = io(cfg.origin, {
+        transports: ['websocket'],
+        auth: { token: cfg.token },
+        reconnection: true,
+        reconnectionAttempts: 8,
+      });
+
+      const joinRooms = () => {
+        socket.emit('join-room', 'admin:orders');
+        socket.emit('join', 'admin:orders');
+        socket.emit('join-room', 'catalog');
+        socket.emit('join', 'catalog');
+      };
+
+      socket.on('connect', joinRooms);
+      socket.on('order.created', poll);
+      socket.on('order.updated', poll);
+      socket.on('catalog.updated', poll);
+      socket.on('catalog_update', poll);
+      socket.on('product.updated', poll);
+      socket.on('stock.updated', poll);
+    } catch (_) {
+      /* polling still runs */
+    }
+  }
+
+  connectSocket();
+  poll();
+  setInterval(poll, 5000);
+}
+
+document.addEventListener('DOMContentLoaded', initAdminDashboardLive);
+document.addEventListener('turbo:load', initAdminDashboardLive);
+document.addEventListener('turbo:render', initAdminDashboardLive);
+{% endverbatim %}
+</script>

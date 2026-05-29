@@ -123,6 +123,7 @@ final class ProductController extends AbstractController
                     'catalog.updated',
                     [
                         'productId' => $pid,
+                        'productName' => (string) $product->getName(),
                         'quantity' => (int) $product->getQuantity(),
                         'removed' => false,
                     ],
@@ -233,6 +234,7 @@ final class ProductController extends AbstractController
                 'catalog.updated',
                 [
                     'productId' => $pid,
+                    'productName' => (string) $product->getName(),
                     'quantity' => (int) $product->getQuantity(),
                     'removed' => false,
                 ],
@@ -299,6 +301,7 @@ final class ProductController extends AbstractController
                     'catalog.updated',
                     [
                         'productId' => $deletedId,
+                        'productName' => (string) $product->getName(),
                         'removed' => true,
                     ],
                 );

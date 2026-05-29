@@ -12,14 +12,18 @@
     <p class="dashboard-subtitle">Welcome back! Here's an overview of your records.</p>
   </div>
 
-  <div class="stats-grid">
+  <div
+    id="dashboardStatsGrid"
+    class="stats-grid"
+    data-poll-url="{{ path('app_staff_dashboard_live_poll') }}"
+    data-ws-config-url="{{ path('app_admin_orders_live_ws_config') }}">
     <div class="stat-card stat-card-products">
       <div class="stat-icon">
         <i class="bi bi-cart-fill"></i>
       </div>
       <div class="stat-content">
         <h3>Total Products</h3>
-        <div class="stat-number">{{ totalProducts }}</div>
+        <div class="stat-number" id="dashStatProducts">{{ totalProducts }}</div>
         <a href="{{ path('app_admin_products_index') }}" class="stat-link">
           <i class="bi bi-arrow-right-circle"></i> View All Products
         </a>
@@ -32,7 +36,7 @@
       </div>
       <div class="stat-content">
         <h3>Total Categories</h3>
-        <div class="stat-number">{{ totalCategories }}</div>
+        <div class="stat-number" id="dashStatCategories">{{ totalCategories }}</div>
         <a href="{{ path('app_admin_categories_index') }}" class="stat-link">
           <i class="bi bi-arrow-right-circle"></i> View All Categories
         </a>
@@ -45,7 +49,7 @@
       </div>
       <div class="stat-content">
         <h3>Total Suppliers</h3>
-        <div class="stat-number">{{ totalSuppliers }}</div>
+        <div class="stat-number" id="dashStatSuppliers">{{ totalSuppliers }}</div>
         <a href="{{ path('app_admin_suppliers_index') }}" class="stat-link">
           <i class="bi bi-arrow-right-circle"></i> View All Suppliers
         </a>
@@ -58,7 +62,7 @@
       </div>
       <div class="stat-content">
         <h3>Total Orders</h3>
-        <div class="stat-number">{{ totalOrders }}</div>
+        <div class="stat-number" id="dashStatOrders">{{ totalOrders }}</div>
         <a href="{{ path('app_admin_orders_index') }}" class="stat-link">
           <i class="bi bi-arrow-right-circle"></i> View All Orders
         </a>
@@ -67,5 +71,6 @@
   </div>
 
   {% include 'admin/stock_logs/_recent.html.twig' %}
+  {% include 'includes/inline/_admin_dashboard_live_js.html.twig' %}
 {% endblock %}
 

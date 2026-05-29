@@ -602,6 +602,7 @@ final class ApiCartService
             'catalog.updated',
             [
                 'productId' => $productId,
+                'productName' => (string) $product->getName(),
                 'quantity' => $removed ? 0 : (int) ($product->getQuantity() ?? 0),
                 'removed' => $removed,
             ],
