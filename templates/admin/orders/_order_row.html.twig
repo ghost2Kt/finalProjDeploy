@@ -1,0 +1,24 @@
+<tr data-order-id="{{ order.id }}" class="orders-table-row">
+    <td>{{ order.orderNumber }}</td>
+    <td>{{ order.customerName }}</td>
+    <td>{{ order.customerEmail }}</td>
+    <td>{{ order.customerPhone }}</td>
+    <td>{{ order.orderDate|date('M d, Y H:i') }}</td>
+    <td>{{ displayStatus ?? order.status }}</td>
+    <td>{{ order.paymentMethod ?: '—' }}</td>
+    <td>₱{{ order.total }}</td>
+    <td class="table-actions">
+        <a href="{{ path('app_admin_order_show', {'id': order.id}) }}" class="btn btn-view icon-btn" title="View">
+            <i class="bi bi-eye"></i>
+        </a>
+        <a href="{{ path('app_admin_order_edit', {'id': order.id}) }}" class="btn btn-edit icon-btn" title="Edit">
+            <i class="bi bi-pencil"></i>
+        </a>
+        <form method="post" action="{{ path('app_admin_order_delete', {'id': order.id}) }}" style="display:inline-block;" onsubmit="return confirm('Are you sure you want to delete this order? This action cannot be undone.');">
+            <input type="hidden" name="_token" value="{{ csrf_token('delete' ~ order.id) }}">
+            <button type="submit" class="btn btn-delete icon-btn" title="Delete">
+                <i class="bi bi-trash"></i>
+            </button>
+        </form>
+    </td>
+</tr>

@@ -7,6 +7,7 @@ parameters:
     uploads_directory: "%kernel.project_dir%/public/uploads"
     app.websocket_broadcast_url_default: ''
     app.websocket_internal_key_default: ''
+    app.websocket_public_url_default: ''
 
 services:
     # default configuration for services in *this* file
@@ -41,3 +42,8 @@ services:
         arguments:
             $broadcastUrl: '%env(default:app.websocket_broadcast_url_default:WEBSOCKET_BROADCAST_URL)%'
             $internalKey: '%env(default:app.websocket_internal_key_default:WEBSOCKET_INTERNAL_KEY)%'
+
+    App\Controller\AdminOrdersLiveController:
+        arguments:
+            $websocketPublicUrl: '%env(default:app.websocket_public_url_default:WEBSOCKET_PUBLIC_URL)%'
+            $websocketBroadcastUrl: '%env(default:app.websocket_broadcast_url_default:WEBSOCKET_BROADCAST_URL)%'

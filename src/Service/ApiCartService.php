@@ -80,6 +80,7 @@ final class ApiCartService
         $product->setQuantity($stock - $reservedQty);
         $this->entityManager->persist($product);
         $this->entityManager->flush();
+        $this->notifyCatalogProduct($product);
 
         $this->writeCart($userId, $cart);
 
@@ -147,6 +148,7 @@ final class ApiCartService
         }
 
         $this->entityManager->flush();
+        $this->notifyCatalogProduct($product);
         $this->writeCart($userId, $cart);
 
         [$items, $total, $totalItems] = $this->buildCartViewFromMap($cart, $request);
@@ -179,6 +181,7 @@ final class ApiCartService
             $product->setQuantity($stock + $currentQty);
             $this->entityManager->persist($product);
             $this->entityManager->flush();
+            $this->notifyCatalogProduct($product);
         }
         unset($cart[$product->getId()]);
 
@@ -231,6 +234,9 @@ final class ApiCartService
                 $this->entityManager->persist($product);
             }
             $this->entityManager->flush();
+            foreach ($productMap as $product) {
+                $this->notifyCatalogProduct($product);
+            }
         }
 
         $userId = $user->getId();
@@ -336,15 +342,30 @@ final class ApiCartService
             sprintf('Order %s created from mobile API checkout', (string) $order->getOrderNumber())
         );
 
+        $orderId = $order->getId();
         $userId = $user->getId();
         if ($userId !== null) {
             $this->webSocketNotifier->notifyUser(
                 $userId,
                 'order.updated',
                 [
-                    'orderId' => $order->getId(),
+                    'orderId' => $orderId,
                     'orderNumber' => $order->getOrderNumber(),
                     'status' => $order->getStatus(),
+                ],
+            );
+        }
+
+        if ($orderId !== null) {
+            $this->webSocketNotifier->notifyRoom(
+                'admin:orders',
+                'order.created',
+                [
+                    'orderId' => $orderId,
+                    'orderNumber' => $order->getOrderNumber(),
+                    'status' => $order->getStatus(),
+                    'customerName' => $order->getCustomerName(),
+                    'total' => (float) $order->getTotal(),
                 ],
             );
         }
@@ -567,6 +588,24 @@ final class ApiCartService
     private function cartCacheKey(int $userId): string
     {
         return 'api_cart_user_' . $userId;
+    }
+
+    private function notifyCatalogProduct(Product $product, bool $removed = false): void
+    {
+        $productId = $product->getId();
+        if ($productId === null) {
+            return;
+        }
+
+        $this->webSocketNotifier->notifyRoom(
+            'catalog',
+            'catalog.updated',
+            [
+                'productId' => $productId,
+                'quantity' => $removed ? 0 : (int) ($product->getQuantity() ?? 0),
+                'removed' => $removed,
+            ],
+        );
     }
 
     private function isValidPhoneNumber(string $phone): bool

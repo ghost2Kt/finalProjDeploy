@@ -136,21 +136,21 @@
             <i class="bi bi-list-check"></i>
         </div>
         <span class="orders-stat-label">Total Orders</span>
-        <div class="orders-stat-value">{{ totalOrders ?? 0 }}</div>
+        <div class="orders-stat-value" id="ordersStatTotal">{{ totalOrders ?? 0 }}</div>
     </div>
     <div class="orders-stat-card orders-stat-card-revenue">
         <div class="orders-stat-icon">
             <i class="bi bi-cash-stack"></i>
         </div>
         <span class="orders-stat-label">Total Revenue</span>
-        <div class="orders-stat-value">₱{{ totalRevenue ?? '0.00' }}</div>
+        <div class="orders-stat-value" id="ordersStatRevenue">₱{{ totalRevenue ?? '0.00' }}</div>
     </div>
     <div class="orders-stat-card orders-stat-card-customers">
         <div class="orders-stat-icon">
             <i class="bi bi-people"></i>
         </div>
         <span class="orders-stat-label">Unique Customers</span>
-        <div class="orders-stat-value">{{ uniqueCustomers ?? 0 }}</div>
+        <div class="orders-stat-value" id="ordersStatCustomers">{{ uniqueCustomers ?? 0 }}</div>
     </div>
 </div>
 
@@ -179,7 +179,10 @@
             white-space: nowrap;
         }
     </style>
-    <table id="ordersTable" class="styled-table">
+    <table id="ordersTable" class="styled-table"
+        data-poll-url="{{ path('app_admin_orders_live_poll') }}"
+        data-row-url-base="{{ path('app_admin_orders_live_row', { id: 0 })|slice(0, -1) }}"
+        data-ws-config-url="{{ path('app_admin_orders_live_ws_config') }}">
         <thead>
             <tr>
                 <th>Order #</th>
@@ -195,30 +198,10 @@
         </thead>
         <tbody>
             {% for order in orders %}
-                <tr>
-                    <td>{{ order.orderNumber }}</td>
-                    <td>{{ order.customerName }}</td>
-                    <td>{{ order.customerEmail }}</td>
-                    <td>{{ order.customerPhone }}</td>
-                    <td>{{ order.orderDate|date('M d, Y H:i') }}</td>
-                    <td>{{ displayStatus[order.id] ?? order.status }}</td>
-                    <td>{{ order.paymentMethod ?: '—' }}</td>
-                    <td>₱{{ order.total }}</td>
-                    <td class="table-actions">
-                        <a href="{{ path('app_admin_order_show', {'id': order.id}) }}" class="btn btn-view icon-btn" title="View">
-                            <i class="bi bi-eye"></i>
-                        </a>
-                        <a href="{{ path('app_admin_order_edit', {'id': order.id}) }}" class="btn btn-edit icon-btn" title="Edit">
-                            <i class="bi bi-pencil"></i>
-                        </a>
-                        <form method="post" action="{{ path('app_admin_order_delete', {'id': order.id}) }}" style="display:inline-block;" onsubmit="return confirm('Are you sure you want to delete this order? This action cannot be undone.');">
-                            <input type="hidden" name="_token" value="{{ csrf_token('delete' ~ order.id) }}">
-                            <button type="submit" class="btn btn-delete icon-btn" title="Delete">
-                                <i class="bi bi-trash"></i>
-                            </button>
-                        </form>
-                    </td>
-                </tr>
+                {% include 'admin/orders/_order_row.html.twig' with {
+                    order: order,
+                    displayStatus: displayStatus[order.id] ?? order.status
+                } only %}
             {% else %}
                 <tr>
                     <td colspan="7" class="no-data">No orders found.</td>
@@ -231,3 +214,5 @@
       <div id="pagination"></div>
     </div>
 </div>
+
+{% include 'includes/inline/_admin_orders_live_js.html.twig' %}

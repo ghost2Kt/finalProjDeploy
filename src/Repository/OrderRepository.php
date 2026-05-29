@@ -37,6 +37,22 @@ class OrderRepository extends ServiceEntityRepository
             ->getResult();
     }
 
+    /**
+     * Orders with id greater than $afterId (for admin live poll).
+     *
+     * @return Order[]
+     */
+    public function findNewerThanId(int $afterId, int $limit = 20): array
+    {
+        return $this->createQueryBuilder('o')
+            ->where('o.id > :afterId')
+            ->setParameter('afterId', $afterId)
+            ->orderBy('o.id', 'ASC')
+            ->setMaxResults($limit)
+            ->getQuery()
+            ->getResult();
+    }
+
     public function findOneForCustomer(int $id, User $user): ?Order
     {
         $email = mb_strtolower(trim((string) $user->getEmail()));

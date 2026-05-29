@@ -1,0 +1,150 @@
+{# Live admin orders: WebSocket (when configured) + polling fallback. No-op if #ordersTable is missing. #}
+<script src="https://cdn.socket.io/4.7.5/socket.io.min.js" crossorigin="anonymous"></script>
+<script>
+{% verbatim %}
+function initAdminOrdersLive() {
+  const table = document.getElementById('ordersTable');
+  if (!table || table.dataset.liveInit === '1') return;
+  table.dataset.liveInit = '1';
+
+  const pollUrl = table.getAttribute('data-poll-url') || '/admin/orders/live/poll';
+  const rowUrlBase = table.getAttribute('data-row-url-base') || '/admin/orders/live/row/';
+  const wsConfigUrl = table.getAttribute('data-ws-config-url') || '/admin/orders/live/ws-config';
+
+  const tbody = table.querySelector('tbody');
+  const statTotal = document.getElementById('ordersStatTotal');
+  const statRevenue = document.getElementById('ordersStatRevenue');
+  const statCustomers = document.getElementById('ordersStatCustomers');
+
+  const knownIds = new Set();
+  tbody.querySelectorAll('tr[data-order-id]').forEach((tr) => {
+    const id = tr.getAttribute('data-order-id');
+    if (id) knownIds.add(id);
+  });
+
+  let maxOrderId = 0;
+  knownIds.forEach((id) => {
+    const n = parseInt(id, 10);
+    if (!Number.isNaN(n) && n > maxOrderId) maxOrderId = n;
+  });
+
+  function updateStats(stats) {
+    if (!stats) return;
+    if (statTotal) statTotal.textContent = String(stats.totalOrders ?? 0);
+    if (statRevenue) statRevenue.textContent = '₱' + (stats.totalRevenue ?? '0.00');
+    if (statCustomers) statCustomers.textContent = String(stats.uniqueCustomers ?? 0);
+  }
+
+  function ingestRow(payload) {
+    if (!payload || !payload.orderId || !payload.html) return;
+    const id = String(payload.orderId);
+    if (knownIds.has(id)) return;
+
+    const noData = tbody.querySelector('tr .no-data');
+    if (noData) noData.closest('tr')?.remove();
+
+    if (window.agriNestOrdersTable && typeof window.agriNestOrdersTable.addRowFromHtml === 'function') {
+      window.agriNestOrdersTable.addRowFromHtml(payload.html);
+    } else {
+      const temp = document.createElement('tbody');
+      temp.innerHTML = payload.html.trim();
+      const tr = temp.querySelector('tr');
+      if (tr) tbody.insertBefore(tr, tbody.firstChild);
+    }
+
+    knownIds.add(id);
+    const n = parseInt(id, 10);
+    if (!Number.isNaN(n) && n > maxOrderId) maxOrderId = n;
+
+    const row = tbody.querySelector('tr[data-order-id="' + id + '"]');
+    if (row) {
+      row.classList.add('orders-row--new');
+      setTimeout(() => row.classList.remove('orders-row--new'), 4000);
+    }
+
+    updateStats(payload.stats);
+  }
+
+  async function fetchRow(orderId) {
+    try {
+      const res = await fetch(rowUrlBase + orderId, {
+        credentials: 'same-origin',
+        headers: { Accept: 'application/json' },
+      });
+      if (!res.ok) return;
+      const data = await res.json();
+      ingestRow(data);
+    } catch (_) {
+      /* optional live updates */
+    }
+  }
+
+  async function poll() {
+    try {
+      const res = await fetch(pollUrl + '?afterId=' + maxOrderId, {
+        credentials: 'same-origin',
+        headers: { Accept: 'application/json' },
+      });
+      if (!res.ok) return;
+      const data = await res.json();
+      (data.orders || []).forEach(ingestRow);
+      if (data.stats) updateStats(data.stats);
+    } catch (_) {
+      /* optional live updates */
+    }
+  }
+
+  function onOrderEvent(data) {
+    const orderId = data && (data.orderId ?? data.order_id);
+    if (orderId) fetchRow(orderId);
+  }
+
+  async function connectSocket() {
+    try {
+      const res = await fetch(wsConfigUrl, {
+        credentials: 'same-origin',
+        headers: { Accept: 'application/json' },
+      });
+      if (!res.ok) return;
+      const cfg = await res.json();
+      if (!cfg.enabled || !cfg.origin || !cfg.token || typeof io === 'undefined') return;
+
+      const socket = io(cfg.origin, {
+        transports: ['websocket'],
+        auth: { token: cfg.token },
+        reconnection: true,
+        reconnectionAttempts: 8,
+      });
+
+      const joinAdminRoom = () => {
+        socket.emit('join-room', 'admin:orders');
+        socket.emit('join', 'admin:orders');
+      };
+
+      socket.on('connect', joinAdminRoom);
+      socket.on('order.created', onOrderEvent);
+      socket.on('order.updated', onOrderEvent);
+    } catch (_) {
+      /* polling still runs */
+    }
+  }
+
+  connectSocket();
+  poll();
+  setInterval(poll, 5000);
+}
+
+document.addEventListener('DOMContentLoaded', initAdminOrdersLive);
+document.addEventListener('turbo:load', initAdminOrdersLive);
+document.addEventListener('turbo:render', initAdminOrdersLive);
+{% endverbatim %}
+</script>
+<style>
+  #ordersTable tr.orders-row--new {
+    animation: orders-row-highlight 4s ease-out;
+  }
+  @keyframes orders-row-highlight {
+    0% { background-color: rgba(255, 206, 84, 0.45); }
+    100% { background-color: transparent; }
+  }
+</style>
